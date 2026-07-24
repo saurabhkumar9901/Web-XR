@@ -1,0 +1,10 @@
+services:
+  aura-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aura-assistant
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env

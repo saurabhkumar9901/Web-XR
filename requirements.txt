@@ -1,0 +1,6 @@
+pipecat-ai[google]
+fastapi
+uvicorn
+websockets
+python-dotenv
+aiohttp
