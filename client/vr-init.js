@@ -8,7 +8,7 @@ import {
   createStarfield, createAmbientParticles, animateAmbientParticles,
   createGroundGlow, createWelcomePanel, createVRButton,
   createMeditationPlatform
-} from './vr-system.js?v=zen10';
+} from './vr-system.js?v=zen11';
 
 // ---- VR State ----
 const vrState = {
