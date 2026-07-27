@@ -286,7 +286,7 @@ let _envConfigPromise = null;
 
 async function _loadEnvironmentConfig() {
   try {
-    const resp = await fetch('/client/environments.json');
+    const resp = await fetch(`/client/environments.json?t=${new Date().getTime()}`);
     const config = await resp.json();
     const cats = config.categories;
     ENVIRONMENTS = config.environments.map(env => ({
