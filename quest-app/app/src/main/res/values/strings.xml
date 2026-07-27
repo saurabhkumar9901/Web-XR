@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Solaya</string>
+    <string name="tunnel_url_hint">https://your-tunnel.trycloudflare.com</string>
+    <string name="tunnel_url_label">Cloudflare Tunnel URL</string>
+    <string name="save_button">Save</string>
+    <string name="launch_button">✦  Launch Solaya</string>
+    <string name="server_status_running">● Server running on localhost:8080</string>
+    <string name="server_status_stopped">○ Server not running</string>
+    <string name="videos_found">📁 Videos: %1$d files (%2$s)</string>
+    <string name="no_videos_found">⚠️ No videos found</string>
+    <string name="adb_instructions">Push videos via ADB:\nadb push videos/*.mp4 /sdcard/Android/data/com.solaya.quest/files/videos/</string>
+    <string name="tunnel_saved">Tunnel URL saved ✓</string>
+    <string name="tunnel_empty_warning">Please enter a Cloudflare Tunnel URL first</string>
+    <string name="notification_channel_name">Solaya Server</string>
+    <string name="notification_content">Local video server is running</string>
+</resources>

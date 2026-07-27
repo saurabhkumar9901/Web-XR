@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Internet access for Cloudflare tunnel WebSocket + CDN assets (Three.js, HLS.js) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Quest VR headset feature (marks this as a VR app) -->
+    <uses-feature
+        android:name="android.hardware.vr.headtracking"
+        android:required="false"
+        android:version="1" />
+
+    <application
+        android:name=".SolayaApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SolayaQuest"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Remove VR category so it launches as a smooth 2D window -->
+                <!-- <category android:name="com.oculus.intent.category.VR" /> -->
+            </intent-filter>
+            
+            <meta-data android:name="com.oculus.supportedDevices" android:value="quest2|eureka" />
+            <meta-data android:name="com.oculus.handtracking.frequency" android:value="LOW" />
+        </activity>
+
+        <!-- Foreground service for keeping the local HTTP server alive -->
+        <service
+            android:name=".LocalServerService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+    </application>
+
+</manifest>

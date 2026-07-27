@@ -1,0 +1,82 @@
+{
+  "cdn_base_url": "https://vz-6d5ae667-c65.b-cdn.net",
+  "categories": {
+    "nature": {
+      "label": "Nature",
+      "scene_name": "nature"
+    },
+    "meditation": {
+      "label": "Meditation",
+      "scene_name": "meditation"
+    },
+    "spiritual": {
+      "label": "Spiritual",
+      "scene_name": "spiritual"
+    }
+  },
+  "environments": [
+    {
+      "sub_type": "nature_snow",
+      "category": "nature",
+      "title": "Snow Mountain",
+      "description": "Cool air, vast peaks, and stillness.",
+      "videoSrc": "/stream/snow_mountains.mp4"
+    },
+    {
+      "sub_type": "nature_water",
+      "category": "nature",
+      "title": "Forest Waterfall",
+      "description": "Flowing water and green stillness.",
+      "videoSrc": "/stream/forest_waterfall.mp4"
+    },
+    {
+      "sub_type": "nature_mix",
+      "category": "nature",
+      "title": "Nature's Serenity",
+      "description": "A soothing mixture of vibrant natural landscapes.",
+      "videoSrc": "/stream/nature_serenity.mp4"
+    },
+    {
+      "sub_type": "japan_tokyo",
+      "category": "nature",
+      "title": "Tokyo Sights & Sounds",
+      "description": "A relaxing 3D 360 journey through the serene sights of Tokyo, Japan.",
+      "videoSrc": "/stream/japan_tokyo.mp4"
+    },
+    {
+      "sub_type": "world_tour",
+      "category": "nature",
+      "title": "World Tour",
+      "description": "Explore breathtaking landscapes from around the world in stunning 360 VR.",
+      "videoSrc": "/stream/world_tour.mp4"
+    },
+    {
+      "sub_type": "global_mix",
+      "category": "nature",
+      "title": "Global City & Nature Mix",
+      "description": "A breathtaking combined VR tour through Tobago Cays, New York City, Santiago, and Philadelphia.",
+      "videoSrc": "/stream/global_mix.mp4"
+    },
+    {
+      "sub_type": "office_meditation",
+      "category": "meditation",
+      "title": "Office Meditation 360",
+      "description": "A lighthearted 10-minute guided meditation to help you Zen out at the office.",
+      "videoSrc": "/stream/office_meditation.mp4"
+    },
+    {
+      "sub_type": "varanasi_river",
+      "category": "spiritual",
+      "title": "Ganges River Tour",
+      "description": "Soar over the Ganges river in Varanasi in this 360 degree relaxation tour.",
+      "videoSrc": "/stream/varanasi_river.mp4"
+    },
+    {
+      "sub_type": "japan_tokyo_aerial",
+      "category": "nature",
+      "title": "Tokyo Aerial View",
+      "description": "A breathtaking aerial view soaring over the peaceful city of Tokyo.",
+      "videoSrc": "/stream/japan_tokyo_aerial.mp4"
+    }
+  ]
+}

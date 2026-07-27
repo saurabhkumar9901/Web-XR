@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura - Local Stream Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { color: #bcffcc; }
+        .card {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        select, button {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background: #334155;
+            color: white;
+            font-size: 1rem;
+            margin-right: 0.5rem;
+        }
+        button {
+            background: #10b981;
+            border-color: #059669;
+            cursor: pointer;
+        }
+        button:hover { background: #059669; }
+        video {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+            aspect-ratio: 16/9;
+            margin-top: 1rem;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #38bdf8; }
+        #log {
+            background: #020617;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Aura Local Stream Test</h1>
+    
+    <div class="card">
+        <h2>Network Info</h2>
+        <div id="network-info">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>Video Player</h2>
+        <div>
+            <select id="video-select">
+                <option value="">Select a video...</option>
+            </select>
+            <button onclick="loadVideo()">Load Video</button>
+        </div>
+        <video id="player" controls playsinline crossorigin="anonymous"></video>
+    </div>
+
+    <div class="card">
+        <h2>Diagnostic Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        function log(msg, type="info") {
+            const logEl = document.getElementById('log');
+            const colorClass = type === "error" ? "error" : (type === "success" ? "success" : "info");
+            logEl.innerHTML += `<span class="${colorClass}">[${new Date().toLocaleTimeString()}] ${msg}</span><br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        async function fetchNetworkInfo() {
+            try {
+                log("Fetching network info...");
+                const res = await fetch('/network-info');
+                const data = await res.json();
+                
+                const currentUrl = new URL(window.location.href);
+                const isLocalhost = currentUrl.hostname === 'localhost' || currentUrl.hostname === '127.0.0.1';
+                
+                let html = `<p><strong>Server LAN IP:</strong> <span class="info">${data.ip}</span></p>`;
+                html += `<p><strong>Access URL (LAN):</strong> <a href="http://${data.ip}:${data.port}/client/stream-test.html" style="color:#bcffcc">http://${data.ip}:${data.port}/client/stream-test.html</a></p>`;
+                
+                if (isLocalhost) {
+                    html += `<p class="error">⚠️ You are currently accessing this via localhost. To test LAN streaming, open the Access URL on your phone or VR headset while connected to the same WiFi.</p>`;
+                } else if (currentUrl.hostname === data.ip) {
+                    html += `<p class="success">✅ You are successfully accessing the server over the LAN!</p>`;
+                }
+                
+                document.getElementById('network-info').innerHTML = html;
+                log("Network info loaded", "success");
+            } catch (e) {
+                document.getElementById('network-info').innerHTML = `<p class="error">Failed to load network info.</p>`;
+                log("Failed to fetch network info: " + e.message, "error");
+            }
+        }
+
+        async function fetchVideos() {
+            try {
+                log("Fetching available videos...");
+                const res = await fetch('/videos-list');
+                const data = await res.json();
+                const select = document.getElementById('video-select');
+                
+                if (data.videos.length === 0) {
+                    log("No videos found in the 'videos/' directory.", "error");
+                    return;
+                }
+                
+                data.videos.forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v;
+                    option.textContent = v;
+                    select.appendChild(option);
+                });
+                
+                // Select the first one
+                select.selectedIndex = 1;
+                log(`Found ${data.videos.length} videos.`, "success");
+            } catch (e) {
+                log("Failed to fetch videos list: " + e.message, "error");
+            }
+        }
+
+        function loadVideo() {
+            const select = document.getElementById('video-select');
+            if (!select.value) {
+                log("Please select a video first.", "error");
+                return;
+            }
+            
+            const filename = encodeURIComponent(select.value);
+            const streamUrl = `/stream/${filename}`;
+            const player = document.getElementById('player');
+            
+            log(`Loading video: ${streamUrl}`);
+            player.src = streamUrl;
+            
+            player.onerror = () => log(`Video playback error: ${player.error.message || player.error.code}`, "error");
+            player.oncanplay = () => log("Video ready to play (byte-range streaming working).", "success");
+            
+            player.play().catch(e => log(`Autoplay blocked or failed: ${e.message}`, "error"));
+        }
+
+        // Init
+        fetchNetworkInfo();
+        fetchVideos();
+    </script>
+</body>
+</html>

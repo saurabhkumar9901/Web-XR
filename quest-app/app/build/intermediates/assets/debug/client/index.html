@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura - Emotional XR Wellness</title>
+
+  <!-- Three.js ES Module Import Map for WebXR support -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #161b2e 0%, #0a0e17 100%);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: white;
+      transition: background 2s ease-in-out;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      transition: all 1.8s cubic-bezier(0.19, 1, 0.22, 1);
+      animation: orbSoftGlow 4s infinite ease-in-out alternate;
+    }
+
+    @keyframes orbSoftGlow {
+      0% {
+        filter: drop-shadow(0 0 20px rgba(241, 238, 52, 0.4));
+      }
+
+      100% {
+        filter: drop-shadow(0 0 80px rgb(156, 165, 36)) drop-shadow(0 0 140px rgba(188, 255, 204, 0.5));
+      }
+    }
+
+    #canvas-container.mini {
+      width: 200px;
+      height: 200px;
+      bottom: 50px;
+      left: 50px;
+      top: auto;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 0 30px rgba(188, 255, 204, 0.3);
+      opacity: 0.85;
+    }
+
+    #ui-layer {
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      text-align: center;
+      width: 100%;
+    }
+
+    #status {
+      display: block;
+      margin-bottom: 30px;
+      font-size: 18px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+      animation: pulse 3s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 0.5;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    #join-btn,
+    #menu-btn,
+    #end-btn {
+      padding: 16px 40px;
+      border-radius: 100px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(15px);
+      color: white;
+      font-size: 15px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    #join-btn:hover,
+    #menu-btn:hover,
+    #end-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.6);
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    #menu-btn {
+      display: none;
+      margin: 12px auto 0;
+      padding: 12px 28px;
+      font-size: 13px;
+      background: rgba(188, 255, 204, 0.08);
+    }
+
+    #end-btn {
+      display: none;
+      margin: 12px auto 0;
+      padding: 12px 28px;
+      font-size: 13px;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    #video-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      background: black;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 2s ease;
+    }
+
+    #video-container.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #tour-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    body.theme-nature {
+      background: radial-gradient(circle at center, #0d211a 0%, #050a08 100%);
+    }
+
+    body.theme-meditation {
+      background: radial-gradient(circle at center, #0a162e 0%, #050a14 100%);
+    }
+
+    body.theme-spiritual {
+      background: radial-gradient(circle at center, #2e0a26 0%, #140510 100%);
+    }
+
+    #intro-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 160;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(8, 12, 20, 0.58);
+      backdrop-filter: blur(8px);
+    }
+
+    #intro-screen.hidden {
+      display: none;
+    }
+
+    .intro-panel {
+      width: min(620px, 100%);
+      text-align: center;
+    }
+
+    .intro-kicker {
+      margin-bottom: 14px;
+      color: rgba(188, 255, 204, 0.82);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .intro-title {
+      margin: 0 0 14px;
+      font-size: clamp(34px, 7vw, 62px);
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1.02;
+    }
+
+    .intro-copy {
+      margin: 0 auto 24px;
+      max-width: 540px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .intro-points {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0 0 26px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .intro-points li {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.045);
+      border-radius: 8px;
+      padding: 12px;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    #voice-selection-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 160;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(8, 12, 20, 0.58);
+      backdrop-filter: blur(8px);
+    }
+
+    #voice-selection-screen.hidden {
+      display: none;
+    }
+
+    .voice-cards {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 30px;
+    }
+
+    .voice-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 30px;
+      width: 200px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .voice-card:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(188, 255, 204, 0.5);
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .voice-card .voice-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(188, 255, 204, 0.15);
+      color: #bcffcc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 auto 20px;
+    }
+
+    .voice-card .voice-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 8px;
+    }
+
+    .voice-card .voice-desc {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      line-height: 1.4;
+    }
+
+    #environment-menu {
+      position: absolute;
+      inset: 0;
+      z-index: 150;
+      display: none;
+      flex-direction: column;
+      background:
+        radial-gradient(ellipse at 15% 35%, rgba(88, 28, 135, 0.3) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 65%, rgba(6, 78, 59, 0.28) 0%, transparent 55%),
+        rgba(4, 6, 12, 0.97);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      overflow: hidden;
+    }
+
+    #environment-menu::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(188, 255, 204, 0.5), rgba(147, 112, 219, 0.4), transparent);
+      z-index: 1;
+    }
+
+    #environment-menu.visible {
+      display: flex;
+      animation: menuReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes menuReveal {
+      from {
+        opacity: 0;
+        transform: scale(0.97);
+        filter: blur(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+      }
+    }
+
+    .menu-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 28px 16px;
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .menu-logo-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .menu-aura-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #bcffcc;
+      box-shadow: 0 0 14px 5px rgba(188, 255, 204, 0.5);
+      animation: auraDot 2.4s infinite ease-in-out;
+      flex-shrink: 0;
+    }
+
+    @keyframes auraDot {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.5);
+        opacity: 0.65;
+      }
+    }
+
+    .menu-eyebrow {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: rgba(188, 255, 204, 0.7);
+      margin-bottom: 2px;
+    }
+
+    .menu-title-new {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: white;
+    }
+
+    .menu-mode-chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 13px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 100px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.65);
+      text-transform: capitalize;
+    }
+
+    .menu-mode-chip .mode-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #bcffcc;
+      flex-shrink: 0;
+    }
+
+    .menu-reason-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 14px 28px 0;
+      padding: 12px 16px;
+      background: rgba(188, 255, 204, 0.06);
+      border: 1px solid rgba(188, 255, 204, 0.15);
+      border-radius: 10px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+
+    .reason-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .menu-timer {
+      padding: 8px 28px 0;
+      font-size: 11px;
+      color: rgba(188, 255, 204, 0.6);
+      flex-shrink: 0;
+    }
+
+    .menu-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0 28px 36px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(188, 255, 204, 0.15) transparent;
+    }
+
+    .menu-scroll::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .menu-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .menu-scroll::-webkit-scrollbar-thumb {
+      background: rgba(188, 255, 204, 0.2);
+      border-radius: 2px;
+    }
+
+    .menu-section-title {
+      margin: 22px 0 12px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    #feedback-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 180;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(7, 10, 14, 0.88);
+      backdrop-filter: blur(14px);
+    }
+
+    #feedback-screen.visible {
+      display: flex;
+    }
+
+    .feedback-panel {
+      width: min(640px, 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(13, 17, 25, 0.95);
+      border-radius: 8px;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
+      padding: 28px;
+    }
+
+    .feedback-title {
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .feedback-copy {
+      margin: 0 0 22px;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .rating-list {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .rating-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.045);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .rating-label {
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .stars {
+      display: flex;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+
+    .star-btn {
+      width: 30px;
+      height: 30px;
+      border: 0;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.28);
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 140ms ease, transform 140ms ease;
+    }
+
+    .star-btn:hover,
+    .star-btn.active {
+      color: #f8d879;
+      transform: translateY(-1px);
+    }
+
+    .feedback-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .feedback-action {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.055);
+      border-radius: 999px;
+      color: white;
+      cursor: pointer;
+      padding: 11px 18px;
+      font-size: 13px;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .feedback-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.34);
+    }
+
+    .feedback-action.primary {
+      background: rgba(188, 255, 204, 0.12);
+      border-color: rgba(188, 255, 204, 0.38);
+    }
+
+    /* ===== PREMIUM ENVIRONMENT CARDS ===== */
+    .environment-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .environment-card {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      background: #080b12;
+      color: white;
+      text-align: left;
+      cursor: pointer;
+      outline: none;
+      padding: 0;
+      transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+        border-color 0.3s ease, box-shadow 0.3s ease;
+      animation: cardIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes cardIn {
+      from {
+        opacity: 0;
+        transform: translateY(22px) scale(0.95);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .environment-card:hover {
+      transform: translateY(-8px) scale(1.03);
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
+      z-index: 2;
+    }
+
+    /* Category accent top bar */
+    .environment-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border-radius: 16px 16px 0 0;
+      z-index: 5;
+    }
+
+    .environment-card:hover::before {
+      opacity: 1;
+    }
+
+    .environment-card[data-cat="nature"]::before {
+      background: linear-gradient(90deg, #4ade80, #22c55e);
+    }
+
+    .environment-card[data-cat="meditation"]::before {
+      background: linear-gradient(90deg, #818cf8, #6366f1);
+    }
+
+    .environment-card[data-cat="spiritual"]::before {
+      background: linear-gradient(90deg, #f472b6, #ec4899);
+    }
+
+    /* Top pick — animated gold ring */
+    .environment-card.top {
+      border-color: rgba(251, 191, 36, 0.55);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.15),
+        inset 0 0 50px rgba(251, 191, 36, 0.04);
+      animation: cardIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both, topPulse 3s 0.5s infinite ease-in-out;
+    }
+
+    @keyframes topPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.15), 0 0 24px rgba(251, 191, 36, 0.08);
+      }
+
+      50% {
+        box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35), 0 0 48px rgba(251, 191, 36, 0.18);
+      }
+    }
+
+    .environment-card.top::before {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+      opacity: 1;
+    }
+
+    .environment-card.recommended:not(.top) {
+      border-color: rgba(129, 140, 248, 0.35);
+    }
+
+    /* Full-bleed video */
+    .card-preview {
+      position: absolute;
+      inset: 0;
+    }
+
+    .card-preview video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      opacity: 0.72;
+      filter: saturate(1.1) brightness(0.8);
+      transition: opacity 0.45s ease, filter 0.45s ease, transform 0.6s ease;
+    }
+
+    .environment-card:hover .card-preview video {
+      opacity: 1;
+      filter: saturate(1.35) brightness(0.88);
+      transform: scale(1.07);
+    }
+
+    /* Gradient overlays */
+    .card-gradient-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 55%;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .card-gradient-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 68%;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.93) 0%, rgba(0, 0, 0, 0.6) 50%, transparent);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Card content layout */
+    .card-content {
+      position: absolute;
+      inset: 0;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 2;
+    }
+
+    .card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 9px;
+      border-radius: 100px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 1px solid;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .card-badge.badge-top {
+      background: rgba(251, 191, 36, 0.15);
+      border-color: rgba(251, 191, 36, 0.5);
+      color: #fbbf24;
+    }
+
+    .card-badge.badge-rec {
+      background: rgba(129, 140, 248, 0.15);
+      border-color: rgba(129, 140, 248, 0.45);
+      color: #a5b4fc;
+    }
+
+    .card-badge.badge-none {
+      display: none;
+    }
+
+    .card-category-pill {
+      padding: 3px 9px;
+      border-radius: 100px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(8px);
+    }
+
+    .card-bottom {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .card-title {
+      display: block;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      line-height: 1.15;
+      color: white;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .card-description {
+      display: block;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.58);
+      line-height: 1.35;
+    }
+
+    .card-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 10px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: white;
+      width: fit-content;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .environment-card.top .card-cta {
+      background: rgba(251, 191, 36, 0.12);
+      border-color: rgba(251, 191, 36, 0.4);
+      color: #fbbf24;
+    }
+
+    .environment-card:hover .card-cta {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ---- WebXR VR Button Styling ---- */
+    #vr-button-container {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: flex;
+      justify-content: center;
+    }
+
+    #vr-button-container button,
+    #vr-button-container a {
+      padding: 14px 28px !important;
+      border-radius: 100px !important;
+      border: 1px solid rgba(188, 255, 204, 0.4) !important;
+      background: rgba(188, 255, 204, 0.1) !important;
+      backdrop-filter: blur(15px);
+      color: white !important;
+      font-size: 14px !important;
+      letter-spacing: 1.5px !important;
+      text-transform: uppercase !important;
+      cursor: pointer !important;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(188, 255, 204, 0.1) !important;
+      font-family: 'Inter', system-ui, sans-serif !important;
+      animation: vrPulse 3s infinite ease-in-out;
+    }
+
+    #vr-button-container button:hover,
+    #vr-button-container a:hover {
+      background: rgba(188, 255, 204, 0.2) !important;
+      border-color: rgba(188, 255, 204, 0.7) !important;
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(188, 255, 204, 0.2) !important;
+    }
+
+    @keyframes vrPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(188, 255, 204, 0.1);
+      }
+
+      50% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 35px rgba(188, 255, 204, 0.25);
+      }
+    }
+
+    /* VR mode: hide HTML overlays */
+    body.vr-active #ui-layer,
+    body.vr-active #environment-menu,
+    body.vr-active #feedback-screen,
+    body.vr-active #intro-screen {
+      display: none !important;
+    }
+
+    /* Do NOT use display: none or opacity: 0 on video in VR, it breaks XRMediaBinding hardware decoding */
+    body.vr-active #video-container {
+      opacity: 0.01 !important;
+      pointer-events: none !important;
+    }
+
+    @media (max-width: 760px) {
+      #environment-menu {
+        padding: 0;
+      }
+
+      .menu-topbar {
+        padding: 16px 16px 12px;
+      }
+
+      .menu-reason-banner {
+        margin: 10px 16px 0;
+      }
+
+      .menu-scroll {
+        padding: 0 16px 28px;
+      }
+
+      .environment-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .rating-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .intro-points {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ===== COUNTDOWN TIMER ===== */
+    #countdown-timer {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 100;
+      background: rgba(10, 15, 26, 0.45);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 12px 20px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    #countdown-timer.visible {
+      display: flex;
+    }
+
+    #countdown-timer .timer-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      animation: timerPing 1.5s infinite ease-in-out;
+    }
+
+    @keyframes timerPing {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+
+      50% {
+        transform: scale(1.4);
+        opacity: 1;
+        box-shadow: 0 0 8px #34d399;
+      }
+    }
+
+    #countdown-timer .timer-text-container {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #countdown-timer .timer-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 2px;
+    }
+
+    #countdown-timer .timer-time {
+      font-family: monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: #bcffcc;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="video-container">
+    <video id="tour-video" playsinline crossorigin="anonymous"></video>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <div id="countdown-timer">
+    <div class="timer-dot"></div>
+    <div class="timer-text-container">
+      <span class="timer-label">Session Time</span>
+      <span id="timer-time" class="timer-time">05:00</span>
+    </div>
+  </div>
+
+  <div id="intro-screen">
+    <div class="intro-panel">
+      <div class="intro-kicker">XR Wellness Companion</div>
+      <h1 class="intro-title">Aura</h1>
+      <p class="intro-copy">A gentle AI presence that listens first, understands how you feel, then guides you into a
+        calming visual environment chosen with you.</p>
+      <ul class="intro-points">
+        <li>Talk with Aura for a short emotional check-in.</li>
+        <li>Choose from calming nature, meditation, and spiritual spaces.</li>
+        <li>End with a soft reflection and feedback.</li>
+      </ul>
+      <button id="join-btn">Begin Journey with Aura</button>
+    </div>
+  </div>
+
+  <div id="voice-selection-screen" class="hidden">
+    <div class="intro-panel">
+      <div class="intro-kicker">Step 1</div>
+      <h1 class="intro-title">Choose a Voice</h1>
+      <p class="intro-copy">Select the voice that feels most comforting to you for this journey.</p>
+
+      <div class="voice-cards">
+        <button type="button" class="voice-card" data-voice="Enceladus">
+          <div class="voice-icon">M</div>
+          <div class="voice-name">Sam</div>
+          <div class="voice-desc">A slow, resonant male voice.</div>
+        </button>
+        <button type="button" class="voice-card" data-voice="Despina">
+          <div class="voice-icon">F</div>
+          <div class="voice-name">Solaya</div>
+          <div class="voice-desc">A gentle, soothing female voice.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ui-layer">
+    <span id="status">Waking up Aura...</span>
+    <button id="menu-btn">Choose Environment</button>
+    <button id="end-btn">End Journey</button>
+  </div>
+
+  <div id="environment-menu" aria-hidden="true">
+    <!-- Topbar -->
+    <div class="menu-topbar">
+      <div class="menu-logo-group">
+        <div class="menu-aura-dot"></div>
+        <div>
+          <div class="menu-eyebrow">XR Wellness</div>
+          <h2 class="menu-title-new">Choose Your Environment</h2>
+        </div>
+      </div>
+      <div class="menu-mode-chip">
+        <div class="mode-dot"></div>
+        <span id="menu-mode-label"></span>
+      </div>
+    </div>
+
+    <!-- Aura's reason -->
+    <div class="menu-reason-banner">
+      <span class="reason-icon">✦</span>
+      <span id="menu-reason">Aura has prepared a few options for you.</span>
+    </div>
+
+    <!-- Timer -->
+    <div id="menu-timer" class="menu-timer"></div>
+
+    <!-- Scrollable card area -->
+    <div class="menu-scroll">
+      <div class="menu-section-title">Recommended by Aura</div>
+      <div id="recommended-grid" class="environment-grid"></div>
+
+      <div class="menu-section-title">All Environments</div>
+      <div id="all-environments-grid" class="environment-grid"></div>
+    </div>
+  </div>
+
+  <div id="feedback-screen" aria-hidden="true">
+    <div class="feedback-panel">
+      <h2 class="feedback-title">Thank you for spending a moment with Aura.</h2>
+      <p class="feedback-copy">Before you go, rate the parts of the experience that felt good. Your response helps shape
+        a softer next session.</p>
+      <div id="rating-list" class="rating-list"></div>
+      <div class="feedback-actions">
+        <button id="feedback-close-btn" class="feedback-action primary">Start over</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VR Button injected here by Three.js VRButton -->
+  <div id="vr-button-container"></div>
+
+  <!-- Bootstrap: Load THREE globally, then existing script, then VR module -->
+  <script type="module">
+    import * as THREE from 'three';
+    window.THREE = THREE;
+
+    // Load existing script.js (non-module, uses global THREE)
+    const script = document.createElement('script');
+    const nocache = Date.now();
+    script.src = `script.js?v=${nocache}`;
+    script.onload = () => {
+      // After script.js runs and fires aura-scene-ready, load VR init
+      import(`./vr-init.js?v=${nocache}`).then(() => {
+        console.log('[Aura] VR init module loaded.');
+      }).catch(err => {
+        console.warn('[Aura] VR init failed (WebXR may not be available):', err);
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+
+</html>

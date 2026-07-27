@@ -1,0 +1,31 @@
+<resources>
+    <style name="Theme.SolayaQuest" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#BCFFCC</item>
+        <item name="colorPrimaryVariant">#6ECF80</item>
+        <item name="colorOnPrimary">#0A0E17</item>
+        <item name="colorSecondary">#818CF8</item>
+        <item name="colorSecondaryVariant">#6366F1</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="android:colorBackground">#0A0E17</item>
+        <item name="colorSurface">#161B2E</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="android:statusBarColor">#0A0E17</item>
+        <item name="android:navigationBarColor">#0A0E17</item>
+        <item name="android:windowBackground">@color/background_dark</item>
+    </style>
+
+    <color name="background_dark">#0A0E17</color>
+    <color name="surface_card">#161B2E</color>
+    <color name="accent_green">#BCFFCC</color>
+    <color name="accent_green_dim">#4DBCFFCC</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B3FFFFFF</color>
+    <color name="text_muted">#66FFFFFF</color>
+    <color name="status_running">#4CAF50</color>
+    <color name="status_stopped">#FF5252</color>
+    <color name="warning_amber">#FFC107</color>
+    <color name="input_bg">#1A1F33</color>
+    <color name="input_border">#33FFFFFF</color>
+    <color name="button_bg">#1ABCFFCC</color>
+    <color name="button_border">#4DBCFFCC</color>
+</resources>

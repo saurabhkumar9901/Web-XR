@@ -1,0 +1,30 @@
+[
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/drawable_button_secondary.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/drawable/button_secondary.xml"
+    },
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/layout_activity_main.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/drawable_input_background.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/drawable/input_background.xml"
+    },
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/drawable_card_background.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/drawable/card_background.xml"
+    },
+    {
+        "merged": "com.solaya.quest.app-merged_res-31:/drawable_button_primary.xml.flat",
+        "source": "com.solaya.quest.app-main-33:/drawable/button_primary.xml"
+    }
+]
