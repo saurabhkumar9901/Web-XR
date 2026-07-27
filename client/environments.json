@@ -77,6 +77,13 @@
       "title": "Tokyo Aerial View",
       "description": "A breathtaking aerial view soaring over the peaceful city of Tokyo.",
       "videoSrc": "/stream/japan_tokyo_aerial.mp4"
+    },
+    {
+      "sub_type": "varanasi_river_2",
+      "category": "spiritual",
+      "title": "Varanasi River tour",
+      "description": "Soar over the Ganges river in Varanasi in this 360 degree relaxation tour.",
+      "videoSrc": "/stream/varanasi_river_2.mp4"
     }
   ]
 }
