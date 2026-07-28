@@ -168,6 +168,18 @@ function stopAmbientMusic() {
 }
 
 function playPCMChunk(pcmData) {
+  if (!audioCtx) return;
+
+  // CRITICAL: Quest Browser silently suspends the AudioContext during XR session
+  // transitions, headset sleep, or tab focus changes. When suspended, all scheduled
+  // PCM buffers are silently dropped (no error). The bgMusic HTML Audio element is
+  // unaffected because it bypasses AudioContext entirely. Force-resume here so the
+  // bot's voice is never lost.
+  if (audioCtx.state === 'suspended') {
+    console.warn('[Aura] AudioContext was suspended — resuming for speech playback');
+    audioCtx.resume();
+  }
+
   const int16Array = new Int16Array(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength / 2);
   const buffer = audioCtx.createBuffer(1, int16Array.length, SPEAKER_SAMPLE_RATE);
   const now = buffer.getChannelData(0);
@@ -195,6 +207,26 @@ function playPCMChunk(pcmData) {
     const idx = activeAudioSources.indexOf(source);
     if (idx > -1) activeAudioSources.splice(idx, 1);
   };
+}
+
+// Keep AudioContext alive during active sessions. Quest Browser can suspend it
+// after ~3s of inactivity (no scheduled buffers). This silent 5s heartbeat
+// prevents that from happening while the user is in a session.
+let _audioKeepAliveInterval = null;
+function startAudioKeepAlive() {
+  stopAudioKeepAlive();
+  _audioKeepAliveInterval = setInterval(() => {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      console.warn('[Aura] AudioContext keepalive: resuming suspended context');
+      audioCtx.resume();
+    }
+  }, 5000);
+}
+function stopAudioKeepAlive() {
+  if (_audioKeepAliveInterval) {
+    clearInterval(_audioKeepAliveInterval);
+    _audioKeepAliveInterval = null;
+  }
 }
 
 function clearAudioQueue() {
@@ -365,6 +397,7 @@ async function startJourney(options = {}) {
 
   initAudio();
   if (audioCtx.state === 'suspended') await audioCtx.resume();
+  startAudioKeepAlive();
   startAmbientMusic();
   bgMusic.play().catch(e => console.warn("[Aura] BG Music play failed at start:", e));
 
@@ -544,6 +577,7 @@ function clearFinalFlowTimers() {
 }
 
 function stopLiveSession() {
+  stopAudioKeepAlive();
   stopAmbientMusic();
   bgMusic.pause();
   bgMusic.currentTime = 0;

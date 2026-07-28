@@ -852,7 +852,10 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
         context_aggregator.assistant(),
     ])
 
-    task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
+    task = PipelineTask(pipeline, params=PipelineParams(
+        allow_interruptions=True,
+        idle_timeout_secs=0,  # Disable idle timeout — Solaya has its own 10-min session timer
+    ))
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
