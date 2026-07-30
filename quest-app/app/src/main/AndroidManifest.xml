@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Quest VR headset feature (marks this as a VR app) -->
     <uses-feature
@@ -38,10 +40,10 @@
             <meta-data android:name="com.oculus.handtracking.frequency" android:value="LOW" />
         </activity>
 
-        <!-- Foreground service for keeping the local HTTP server alive -->
+        <!-- Foreground service for keeping the local HTTP server and Pipecat alive -->
         <service
             android:name=".LocalServerService"
-            android:foregroundServiceType="dataSync"
+            android:foregroundServiceType="dataSync|microphone"
             android:exported="false" />
     </application>
 

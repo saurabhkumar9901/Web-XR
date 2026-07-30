@@ -20,10 +20,8 @@ drawable card_background
 drawable input_background
 id adbInstructions
 id launchButton
-id saveButton
 id serverStatus
 id tunnelStatus
-id tunnelUrlInput
 id videosStatus
 layout activity_main
 mipmap ic_launcher

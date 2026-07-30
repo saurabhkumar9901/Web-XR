@@ -282,7 +282,7 @@ window._AURA_JOURNEY_STARTED = () => journeyStarted;
 
 const bgMusic = new Audio('assets/visuals/Flutes_bg.mp3');
 bgMusic.loop = true;
-bgMusic.volume = 0.6;
+bgMusic.volume = 0.2;
 
 const MENU_BRIEFING_DELAY_SECONDS = 12;
 const MENU_FINAL_CHOICE_PAUSE_SECONDS = 30;
@@ -415,57 +415,18 @@ async function startJourney(options = {}) {
     wsHost = window.location.host;
   }
   const voiceParam = options.voice ? `voice=${options.voice}` : `voice=Despina`;
+  window.latestVoice = options.voice || 'Despina';
   const resumeParam = options.resume ? `&resume=true` : `&resume=false`;
-  ws = new WebSocket(`${wsProtocol}//${wsHost}/ws?${voiceParam}${resumeParam}`);
+  const medParam = options.meditation ? `&meditation=true&subType=${options.subType}&gCat=${options.gCat}&gSub=${options.gSub}` : ``;
+  ws = new WebSocket(`${wsProtocol}//${wsHost}/ws?${voiceParam}${resumeParam}${medParam}`);
   ws.binaryType = 'arraybuffer';
 
   ws.onopen = async () => {
     statusText.innerText = "Listening to your presence...";
     joinBtn.style.display = 'none';
     menuBtn.style.display = 'none';
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: MIC_SAMPLE_RATE
-        }
-      });
-      activeMicStream = stream;
-      const source = audioCtx.createMediaStreamSource(stream);
-      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-      activeMicSource = source;
-      activeMicProcessor = processor;
-
-      source.connect(processor);
-      processor.connect(audioCtx.destination);
-
-      processor.onaudioprocess = (e) => {
-        if (micMuted) return; // Mute microphone transmission during guided meditation
-
-        if (ws.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-
-          // Simple linear interpolation downsampling from 24kHz to 16kHz (ratio 1.5)
-          const ratio = 1.5;
-          const outputLength = Math.round(inputData.length / ratio);
-          const pcmData = new Int16Array(outputLength);
-          for (let i = 0; i < outputLength; i++) {
-            const index = i * ratio;
-            const indexFloor = Math.floor(index);
-            const indexCeil = Math.min(inputData.length - 1, indexFloor + 1);
-            const weight = index - indexFloor;
-            const interpolatedValue = inputData[indexFloor] * (1 - weight) + inputData[indexCeil] * weight;
-            pcmData[i] = Math.max(-1, Math.min(1, interpolatedValue)) * 0x7FFF;
-          }
-          ws.send(pcmData.buffer);
-        }
-      };
-    } catch (err) {
-      console.error("Mic Error:", err);
-      statusText.innerText = "Microphone access denied.";
+    if (!options.resume) {
+      showVoiceMenu();
     }
   };
 
@@ -492,9 +453,20 @@ async function startJourney(options = {}) {
       if (data.action === "user_started_speaking") {
         console.log("[Aura] User started speaking, flushing audio queue.");
         clearAudioQueue();
+      }
+      if (data.action === "bot_started_speaking") {
+        console.log("[Aura] Bot started speaking (Native)");
+        window.botIsSpeaking = true;
+      }
+      if (data.action === "bot_stopped_speaking") {
+        console.log("[Aura] Bot stopped speaking (Native)");
+        window.botIsSpeaking = false;
+      }
+      if (data.action === "bot_audio_level") {
+        window.botNativeAudioLevel = data.level; // Real-time RMS volume from Android PCM stream!
       } else if (data.action === "trigger_scene") {
         console.log("[Aura] TRIGGER DETECTED:", data.scene_name, data.sub_type, data.guidance_category, data.guidance_subcategory);
-        
+
         // Auto-generated VIDEO_MAP matching handleSceneChange logic to check if we are already in/loading this scene
         const VIDEO_MAP = {};
         if (Array.isArray(ENVIRONMENTS)) {
@@ -510,6 +482,15 @@ async function startJourney(options = {}) {
 
         if (!isAlreadyPlaying) {
           clearAudioQueue(); // Safe flush at boundary!
+          console.log(`[Aura] AI triggered environment ${data.sub_type}. Triggering WebSocket reconnect for meditation init.`);
+          startJourney({
+            voice: window.latestVoice || document.getElementById('voice-select')?.value || 'Despina',
+            resume: true,
+            meditation: true,
+            subType: data.sub_type,
+            gCat: data.guidance_category,
+            gSub: data.guidance_subcategory
+          });
         }
         hideEnvironmentMenu();
         handleSceneChange(data.scene_name, data.sub_type, data.guidance_category, data.guidance_subcategory);
@@ -527,18 +508,24 @@ async function startJourney(options = {}) {
         finalizeJourney({ notifyBackend: false });
       } else if (data.action === "end_session") {
         console.log("[Aura] END SESSION REQUESTED BY BACKEND", data);
-        clearAudioQueue(); // Safe flush at boundary!
         environmentPhaseStarted = false;
-        resetToIdle();
-        if (data.show_feedback) {
-          showFeedbackScreen();
-        } else {
-          returnToStart();
-        }
+        
+        // Wait for bot to finish speaking its farewell before ending
+        const attemptEnd = () => {
+          if (audioQueue.length === 0 && !botIsSpeaking) {
+            clearAudioQueue();
+            resetToIdle();
+            if (data.show_feedback) {
+              showFeedbackScreen();
+            } else {
+              returnToStart();
+            }
+          } else {
+            setTimeout(attemptEnd, 500);
+          }
+        };
+        attemptEnd();
       }
-    } else if (rawData instanceof ArrayBuffer || rawData instanceof Uint8Array || rawData instanceof Blob) {
-      // It's pure audio
-      playPCMChunk(new Uint8Array(rawData));
     }
   };
 
@@ -553,7 +540,6 @@ async function startJourney(options = {}) {
   };
 }
 window._AURA_START_JOURNEY = startJourney;
-
 
 function formatMode(value) {
   return (value || '').replace(/_/g, ' ');
@@ -945,6 +931,10 @@ function showFeedbackScreen() {
   hideEnvironmentMenu();
   menuBtn.style.display = 'none';
   endBtn.style.display = 'none';
+
+  // Hide the glowing orb so the user is "outside the glowing orb page"
+  sphere.visible = false;
+
   renderFeedbackRatings();
   feedbackScreen.classList.add('visible');
   feedbackScreen.setAttribute('aria-hidden', 'false');
@@ -988,17 +978,19 @@ function selectEnvironment(env, options = {}) {
   console.log("[Aura] Microphone remains active so user can request to exit.");
   const switchingEnvironment = tourState === "tour" || environmentPhaseStarted;
   feedbackShownForCurrentTour = false;
-  sendClientMessage('environment_selected', {
-    scene_name: env.sceneName,
-    sub_type: env.subType,
-    title: env.title,
-    guidance_category: latestMenuGuidance.guidanceCategory,
-    guidance_subcategory: latestMenuGuidance.guidanceSubcategory,
-    recommendation_reason: latestMenuData?.reason || '',
-    visual_started: true,
-    automatic: Boolean(options.automatic),
-    switching_environment: switchingEnvironment
+
+  console.log(`[Aura] Selecting environment ${env.subType}. Triggering WebSocket reconnect for meditation init.`);
+  // Force a WebSocket reconnect to push the AI directly into guided meditation context
+  // This bypasses unreliable clientContent message injections during active audio.
+  startJourney({
+    voice: window.latestVoice || document.getElementById('voice-select')?.value || 'Despina',
+    resume: true,
+    meditation: true,
+    subType: env.subType,
+    gCat: latestMenuGuidance.guidanceCategory,
+    gSub: latestMenuGuidance.guidanceSubcategory
   });
+
   hideFeedbackScreen();
   hideEnvironmentMenu();
   const prefix = options.automatic ? 'Aura chose' : 'Preparing';
@@ -1180,7 +1172,9 @@ function showVoiceMenu() {
   voiceSelectionScreen.classList.remove('hidden');
 }
 
-joinBtn.addEventListener('click', () => startJourney());
+joinBtn.addEventListener('click', () => {
+  startJourney();
+});
 
 voiceCards.forEach(card => {
   card.addEventListener('click', (e) => {
@@ -1195,17 +1189,12 @@ voiceCards.forEach(card => {
     const url = ws.url;
     const currentVoice = url.includes('voice=Enceladus') ? 'Enceladus' : 'Despina';
 
-    if (selectedVoice !== currentVoice) {
-      console.log("[Aura] Switching voice to " + selectedVoice);
-      closingForReset = true;
-      ws.close();
-      setTimeout(() => {
-        startJourney({ voice: selectedVoice, resume: true });
-      }, 150);
-    } else {
-      console.log("[Aura] Voice matches, continuing session.");
-      sendClientMessage('voice_selected', { voice: selectedVoice });
-    }
+    console.log("[Aura] Voice selected: " + selectedVoice + ", forcing reconnect to sync state.");
+    closingForReset = true;
+    ws.close();
+    setTimeout(() => {
+      startJourney({ voice: selectedVoice, resume: true });
+    }, 1500);
   });
 });
 menuBtn.addEventListener('click', showFallbackEnvironmentMenu);
@@ -1225,11 +1214,11 @@ feedbackCloseBtn.addEventListener('click', returnToStart);
 let time = 0;
 const ORB_DRIFT_SPEED = 0.004;
 const ORB_ROTATION_Y_SPEED = 0.00004;
-const ORB_ROTATION_X_SPEED = 0.000025;
+const ORB_ROTATION_X_SPEED = 0.000100;
 const ORB_VOLUME_SMOOTHING = 0.045;
 const ORB_VOICE_ROTATION = 0.006;
 const ORB_BASE_RIPPLE = 0.055;
-const ORB_VOICE_RIPPLE = 0.22;
+const ORB_VOICE_RIPPLE = 0.66;
 
 let lastFrameTime = performance.now();
 function animate(timestamp) {
@@ -1248,6 +1237,13 @@ function animate(timestamp) {
     targetVolume = sum / dataArray.length;
   }
 
+  // Native Android Audio Volume Sync — only override when bot is actively speaking
+  if (window.botIsSpeaking && typeof window.botNativeAudioLevel !== 'undefined' && window.botNativeAudioLevel > 0.01) {
+    targetVolume = (window.botNativeAudioLevel * 150);
+  } else if (!window.botIsSpeaking) {
+    // Orb should be idle (no pulsing) when bot is not speaking
+    targetVolume = 0;
+  }
   currentVolume += (targetVolume - currentVolume) * ORB_VOLUME_SMOOTHING;
   const volumeScale = currentVolume / 100.0;
 

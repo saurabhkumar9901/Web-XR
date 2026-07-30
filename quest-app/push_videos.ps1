@@ -20,7 +20,7 @@ if (-not (Test-Path "$ProjectRoot\videos")) {
 }
 
 $VideosDir = Join-Path $ProjectRoot "videos"
-$QuestPath = "/sdcard/Android/data/com.solaya.quest/files/vr_videos"
+$QuestPath = "/sdcard/Android/data/com.solaya.quest.v2/files/vr_videos"
 
 if (-not (Test-Path $VideosDir)) {
     Write-Host "[ERROR] Videos directory not found: $VideosDir" -ForegroundColor Red
@@ -54,7 +54,7 @@ Write-Host "  Solaya Quest - Video Push" -ForegroundColor Cyan
 Write-Host "  ========================" -ForegroundColor Cyan
 Write-Host ""
 
-$QuestPath = "/sdcard/Android/data/com.solaya.quest/files/vr_videos"
+$QuestPath = "/sdcard/Android/data/com.solaya.quest.v2/files/vr_videos"
 
 # Check if directory exists on Quest (app must be opened first)
 Write-Host "  Checking if directory exists on Quest..." -ForegroundColor Yellow

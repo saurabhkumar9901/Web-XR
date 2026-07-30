@@ -22,6 +22,9 @@ class SolayaApp : Application() {
     var localServer: LocalServer? = null
         private set
 
+    var pipecatManager: PipecatManager? = null
+        private set
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -70,7 +73,9 @@ class SolayaApp : Application() {
 
         try {
             localServer = LocalServer(this, SERVER_PORT)
-            localServer?.start()
+            pipecatManager = PipecatManager(this, localServer!!)
+            localServer?.pipecatManager = pipecatManager
+            localServer?.start(0, false)
             Log.i(TAG, "Local server started on port $SERVER_PORT")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start local server", e)
@@ -78,6 +83,8 @@ class SolayaApp : Application() {
     }
 
     fun stopLocalServer() {
+        pipecatManager?.stopSession()
+        pipecatManager = null
         localServer?.stop()
         localServer = null
         Log.i(TAG, "Local server stopped")

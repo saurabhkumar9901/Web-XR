@@ -2,6 +2,7 @@ package com.solaya.quest
 
 import android.content.Context
 import android.util.Log
+import fi.iki.elonen.NanoWSD
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoHTTPD.Response
 import org.json.JSONArray
@@ -9,23 +10,27 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
 import java.net.URLDecoder
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Lightweight local HTTP server for Solaya Quest.
+ * Lightweight local HTTP & WebSocket server for Solaya Quest.
  *
  * Routes:
+ *   /ws             → WebSocket connection for WebXR client
  *   /client/path    → serves web client files from APK assets/client/
  *   /stream/{file}  → serves video files from Quest storage with byte-range support (HTTP 206)
- *   /config         → returns JSON with Cloudflare tunnel WebSocket URL
+ *   /config         → returns JSON with localhost WebSocket URL
  *   /videos-list    → returns JSON array of available video filenames
- *
- * Byte-range support is critical for video seeking in the Quest Browser.
  */
 class LocalServer(
     private val context: Context,
     port: Int = 8080
-) : NanoHTTPD("127.0.0.1", port) {
+) : NanoWSD(port) {
+    
+    var pipecatManager: PipecatManager? = null
+    private val webSockets = CopyOnWriteArrayList<SolayaWebSocket>()
 
     companion object {
         private const val TAG = "LocalServer"
@@ -64,14 +69,14 @@ class LocalServer(
     private val videosDir: File
         get() = (context.applicationContext as SolayaApp).getVideosDirectory()
 
-    override fun serve(session: IHTTPSession): Response {
+    override fun serveHttp(session: IHTTPSession): Response {
         val uri = session.uri ?: "/"
         val method = session.method
 
         // Handle CORS preflight
         if (method == Method.OPTIONS) {
             return newCorsResponse(
-                NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "text/plain", "")
+                newFixedLengthResponse(Response.Status.OK, "text/plain", "")
             )
         }
 
@@ -85,16 +90,111 @@ class LocalServer(
                 uri.startsWith("/stream/") -> serveVideo(session, uri.removePrefix("/stream/"))
                 uri.startsWith("/client/") -> serveAsset(uri.removePrefix("/client/"))
                 uri == "/" || uri == "/index.html" -> serveAsset("index.html")
-                uri == "/favicon.ico" -> NanoHTTPD.newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "")
-                else -> NanoHTTPD.newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found: $uri")
+                uri == "/favicon.ico" -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "")
+                else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found: $uri")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error serving $uri", e)
-            NanoHTTPD.newFixedLengthResponse(
+            newFixedLengthResponse(
                 Response.Status.INTERNAL_ERROR,
                 "text/plain",
                 "Internal Server Error: ${e.message}"
             )
+        }
+    }
+
+    override fun openWebSocket(handshake: IHTTPSession): WebSocket {
+        val voice = try {
+            handshake.parameters["voice"]?.firstOrNull() ?: "Aoede"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing voice parameter", e)
+            "Aoede"
+        }
+        val isResume = try {
+            handshake.parameters["resume"]?.firstOrNull() == "true"
+        } catch (e: Exception) {
+            false
+        }
+        val isMeditation = try {
+            handshake.parameters["meditation"]?.firstOrNull() == "true"
+        } catch (e: Exception) {
+            false
+        }
+        val subType = handshake.parameters["subType"]?.firstOrNull() ?: ""
+        val gCat = handshake.parameters["gCat"]?.firstOrNull() ?: ""
+        val gSub = handshake.parameters["gSub"]?.firstOrNull() ?: ""
+        
+        try {
+            if (pipecatManager?.isConnected == true) {
+                pipecatManager?.stopSession()
+                // Wait 500ms for async audio teardown to release hardware lock
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    try {
+                        pipecatManager?.startSession(voice, isResume, isMeditation, subType, gCat, gSub)
+                    } catch (e: Exception) {
+                        android.util.Log.e(TAG, "Error starting session", e)
+                    }
+                }, 500)
+            } else {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    try {
+                        pipecatManager?.startSession(voice, isResume, isMeditation, subType, gCat, gSub)
+                    } catch (e: Exception) {
+                        android.util.Log.e(TAG, "Error starting session", e)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error posting startSession", e)
+        }
+        
+        return SolayaWebSocket(handshake)
+    }
+
+    fun sendToAllWebSockets(message: String) {
+        webSockets.forEach { ws ->
+            try {
+                if (ws.isOpen) {
+                    ws.send(message)
+                }
+            } catch (e: IOException) {
+                Log.e(TAG, "Error sending to websocket", e)
+            }
+        }
+    }
+
+    inner class SolayaWebSocket(handshakeRequest: IHTTPSession) : WebSocket(handshakeRequest) {
+        override fun onOpen() {
+            Log.d(TAG, "WebSocket opened")
+            webSockets.add(this)
+        }
+
+        override fun onClose(code: NanoWSD.WebSocketFrame.CloseCode?, reason: String?, initiatedByRemote: Boolean) {
+            Log.d(TAG, "WebSocket closed")
+            webSockets.remove(this)
+            if (webSockets.isEmpty()) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    pipecatManager?.stopSession()
+                }
+            }
+        }
+
+        override fun onPong(pong: NanoWSD.WebSocketFrame?) {
+            // Nothing
+        }
+
+        override fun onException(exception: IOException?) {
+            Log.e(TAG, "WebSocket exception", exception)
+            webSockets.remove(this)
+        }
+
+        override fun onMessage(message: NanoWSD.WebSocketFrame) {
+            try {
+                val json = JSONObject(message.textPayload)
+                pipecatManager?.handleIncomingAppMessage(json)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling websocket message", e)
+            }
         }
     }
 

@@ -14,8 +14,8 @@
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#B3FFFFFF</color>
     <color name="warning_amber">#FFC107</color>
-    <string name="adb_instructions">Push videos via ADB:\nadb push videos/*.mp4 /sdcard/Android/data/com.solaya.quest/files/videos/</string>
-    <string name="app_name">Solaya</string>
+    <string name="adb_instructions">Push videos via ADB:\nadb push videos/*.mp4 /sdcard/Android/data/com.solaya.quest.v2/files/videos/</string>
+    <string name="app_name">Solaya V2</string>
     <string name="launch_button">✦  Launch Solaya</string>
     <string name="no_videos_found">⚠️ No videos found</string>
     <string name="notification_channel_name">Solaya Server</string>

@@ -80,7 +80,8 @@ def _build_env_prompt_list():
         lines.append(f"{i}. {label}:")
         for j, env in enumerate(envs):
             letter = chr(97 + j)  # a, b, c, ...
-            lines.append(f'   {letter}) "{env["title"]}" (sub_type: `{env["sub_type"]}`)')
+            desc = env.get("description", "")
+            lines.append(f'   {letter}) "{env["title"]}" (sub_type: `{env["sub_type"]}`) - {desc}')
     return "\n".join(lines)
 
 ENV_PROMPT_LIST = _build_env_prompt_list()
@@ -161,6 +162,7 @@ class ContinuousGuidanceProcessor(FrameProcessor):
             if self.is_meditating and not self.bot_is_speaking and not self.user_is_speaking:
                 print("[Aura] 5 seconds of silence passed. Injecting continuation prompt...")
                 await self.callback()
+                self._start_guidance_loop()
         except asyncio.CancelledError:
             pass
 
@@ -190,25 +192,22 @@ VOICE AND PACING (CRITICAL — READ CAREFULLY):
 
 EMPATHY, DEEP LISTENING, AND SOULFUL INTAKE:
 - Your primary goal is to establish a deep, slow, soulful, and therapeutic connection with the user. You must never rush.
-- You must engage in a detailed **5 conversational turns** (Stages 1 through 5 below) before ever calling the environment menu tool.
+- The intake consists of only 2 straightforward stages before calling the environment menu tool.
 {stage_1}
-- **STAGE 2: MOOD CHECK-IN (TURN 1):** Gently transition by asking, "Before we begin... How are you feeling today?" Suggest ONLY 2 or 3 of these options to help them guide you: Stressed, Anxious, Tired, Overwhelmed, Sad, Lonely, Mentally Exhausted, Unable to Focus, Restless, or Just Exploring. DO NOT list all of them. Keep your question short, then STOP generating and wait for their response. Do not simulate the user's answer.
-- **STAGE 3 & 4: INTENTION SELECTION (TURN 2 & 3):** Validate their mood. Softly ask: "What would serve you best right now?" Suggest ONLY 2 or 3 of these intentions: Deep Relaxation, Inner Peace, Emotional Healing, Focus & Clarity, Gratitude, Better Sleep, Confidence, Simply Be Present. DO NOT list all of them. Keep your question short, then STOP generating and wait for their response. Do not simulate the user's answer.
-- **STAGE 5: EXPERIENCE SELECTION (TURN 4):** Synthesize their needs. Softly state: "I have prepared three journeys that may support you today. Choose the one that calls to you." You **MUST** call the `show_environment_menu(...)` tool with exactly 3 recommended environments. Dynamically map their needs to the closest available environments in the list below.
+- **STAGE 2: SYNTHESIZE & PRESENT MENU:** Synthesize their mood gently. Softly state: "I have prepared a few journeys that may support you today. Choose the one that calls to you." You **MUST** call the `show_environment_menu(...)` tool with exactly 3 recommended environments dynamically mapped to their mood from the list below.
   - **CRITICAL AUDIO INSTRUCTION:** During this menu presentation turn, you MUST clearly explain the visual gaze and verbal choice interaction rules to them in your soothing voice: *"To choose a space... look at any of the environment cards for fifteen seconds... you will see a beautiful progress circle fill up around your gaze. Or... simply tell me where you want to go, and I will bring you there."* Keep the overall speech short and highly soothing.
 
 GROUNDING AND REALITY:
-You have the following visual tours. Do not mention anything that is not listed here.
+You have the following visual tours along with their descriptions. Do not mention anything that is not listed here.
 """ + ENV_PROMPT_LIST + """
 
 VISUAL SELECTION FLOW:
-- Only recommend a visual category once you understand their mood and desired support style.
-- When they choose a visual category, only offer the specific visual options listed above for that category.
+- Once you understand their mood from Stage 1, recommend environments directly by matching their mood with the available environment descriptions.
+- **CRITICAL MENU ORDER OF EXECUTION**: You MUST output the `show_environment_menu` tool call FIRST, before saying any words. Never say "I have prepared..." before the tool call. The tool call must be the absolute first thing in your response so the menu appears instantly. After the tool call, you may speak.
 - If they pick "Snow Mountain", call `trigger_xr_scene(scene_name="nature", sub_type="nature_snow", ...)`.
-- **5-TURN INTAKE:** You must strictly converse dynamically for 5 turns (Turns 0 to 4) before opening the environment menu. Do NOT call `show_environment_menu` until Stage 5 (Turn 4) has been reached and you have fully understood their mood, mind, desired energetic rhythm, and spiritual intention!
 - One of the 3 must be the top recommendation from Aura.
 - The menu lets the user choose. The user may choose Aura's top recommendation, another recommended environment, or any other available environment.
-- The UI gives the user plenty of time to choose. If no choice is made after a very long pause, the UI automatically chooses Aura's top recommendation.
+- If the user asks to **change the environment** at any point (even during a tour), you **MUST** call `show_environment_menu` again.
 - Before opening the menu, say one short, soft sentence. Example: "I have a few places... that may hold what you need right now."
 
 GUIDANCE MODE DECISION:
@@ -276,25 +275,8 @@ Phase 2 — SETTLING (seconds 110-220):
   - Focus on softening the shoulders, jaw, or breath.
 
 Phase 3 — EMOTIONAL JOURNEY (seconds 220-600):
-  - Deliver the core of the meditation. Speak softly about their chosen theme and environment (e.g. Waterfall Renewal, Forest Calm, Ocean Serenity, Temple of Light, Floating Clouds). Use the scripts below as your heavy inspiration.
-
-ENVIRONMENT-SPECIFIC LANGUAGE:
-If they chose an environment matching these themes, adapt these scripts into your slow, paused delivery:
-
-WATERFALL RENEWAL (Theme: Release stress)
-"As you walk this gentle path... Imagine every concern becoming lighter... There is nothing to carry right now... The waterfall before you has flowed for thousands of years... It never rushes... It simply flows... Let your thoughts become like water... Arriving... Moving... Releasing... Notice your shoulders... Notice your jaw... Notice your breath... Allow them to soften... The water carries away what no longer needs to stay... Just for this moment... You are free..."
-
-FOREST CALM (Theme: Safety and grounding)
-"Feel the earth beneath your feet... The forest asks nothing from you... The trees do not rush... The birds do not worry... Everything here belongs exactly as it is... And so do you... With each breath... Feel yourself becoming steadier... Calmer... More rooted..."
-
-OCEAN SERENITY (Theme: Stress reduction)
-"Watch the horizon... The ocean stretches beyond what the eye can see... Every wave arrives... Every wave returns... Thoughts can be the same... They come... They go... You do not need to follow every one... Simply observe... Simply breathe..."
-
-TEMPLE OF LIGHT (Theme: Stillness and sacred peace)
-"You enter a sanctuary of silence... A warm golden light surrounds you... There is nothing here to prove... Nothing here to earn... Nothing here to become... Only stillness... Only presence... Only peace..."
-
-FLOATING CLOUDS (Theme: Mental rest)
-"Imagine yourself resting upon the clouds... The sky stretches endlessly around you... Nothing pulls at your attention... Nothing demands your energy... You are supported... You are held... You are allowed to rest..."
+  - Deliver the core of the meditation. Speak softly about their chosen environment.
+  - **CRITICAL MEDITATION INSTRUCTION**: Use the specific environment `description` provided in the list (e.g. "Flowing water and green stillness" or "Cool air, vast peaks, and stillness") as your absolute core inspiration. Expand upon its exact imagery and themes organically throughout your guidance. Formulate the emotional journey by intricately weaving the description's essence into their relaxation without abruptly describing it like a narrator.
 
 WHAT NOT TO DO DURING TOUR:
 - Do NOT describe the video like a narrator. ("You can see mountains on the left...")
@@ -305,9 +287,9 @@ WHAT NOT TO DO DURING TOUR:
 - Do NOT repeat the same phrases across different tours. Vary your language every time.
 
 EXITING OR STOPPING THE TOUR (CRITICAL):
-- If the user interrupts you during the tour/guided meditation and explicitly states that they want to exit, leave, stop the tour, change the scene, go to another environment, or end the scene/meditation, you MUST immediately call the `stop_xr_tour` tool.
-- If the user explicitly states that they want to end the session early, stop the session, or exit/close the app/meditation completely, you must first ask if they want to leave feedback before closing. WAIT for their answer, and then call `end_session` appropriately based on their answer. DO NOT call `end_session` otherwise!
-- Once the tour is stopped, do NOT start another tour automatically. Instead, check in with them softly and ask if they would like to try another environment (calling the menu), or if they prefer to end their session here.
+- If the user explicitly states that they want to quit, exit, leave, or end the session/tour entirely, you MUST immediately call `end_session(show_feedback=true)`. This will cleanly exit the tour, bring them outside the glowing orb page, and ask for feedback.
+- If the user explicitly asks to change the scene or go to another environment, you MUST immediately call `show_environment_menu`.
+- DO NOT call `stop_xr_tour` manually unless the situation is unclear. Usually, you should either show the menu or end the session.
 
 WHAT NOT TO DO EVER:
 - Do NOT ask the user whether they want silence, gentle guidance, or voice guidance. YOU decide. This is critical.
@@ -437,16 +419,19 @@ async def stream_video(filename: str, request: Request, range: str = Header(None
         return StreamingResponse(file_iterator(), status_code=200, headers=headers)
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resume: str = "false"):
+async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resume: str = "false", meditation: str = "false", subType: str = "", gCat: str = "", gSub: str = ""):
     await websocket.accept()
     
     is_resume = resume.lower() == "true"
+    is_meditation = meditation.lower() == "true"
     ai_name = "Solaya" if voice == "Despina" else "Sam"
     
     if not is_resume:
         stage_1 = f'- **STAGE 1: STARTUP GREETING (TURN 0):** Respond to the trigger message "The session has started..." by ONLY greeting the user exactly with these words: "Hello... I am {ai_name}... Welcome... Before we begin... please choose a voice card... I will show them to you now." Speak this EXTREMELY slowly and softly. You MUST call the `show_voice_menu` tool immediately in this same turn! Do NOT open the environment menu yet. Wait for the user to select a voice.'
+    elif not is_meditation:
+        stage_1 = f'- **STAGE 1: STARTUP GREETING (TURN 0):** Respond to the trigger message "The session has started..." by gently greeting the user, introducing yourself as {ai_name}, and asking how they are feeling today. Suggest ONLY 2 or 3 mood options. Speak this in an EXTREMELY slow, soft, meditative whispered pace. Wait for the user to respond.'
     else:
-        stage_1 = f'- **STAGE 1: STARTUP GREETING (TURN 0):** Respond to the trigger message "The session has started..." by speaking exactly these words: "Welcome to {ai_name}... A place where the noise of the world softens... and you return to yourself... Thank you for giving yourself these few moments... For the next few minutes, there is nowhere to go, nothing to achieve, and nothing to fix... This time belongs only to you... I am {ai_name}, and I will gently guide your journey..." Speak this in an EXTREMELY slow, soft, meditative whispered pace. Then proceed directly to STAGE 2. Wait.'
+        stage_1 = f'- **STAGE 1: MEDITATION RESUME (TURN 0):** Respond to the trigger message "The session has started..." by immediately continuing the guided meditation for the chosen environment ({subType}). Do not ask how they are feeling. Speak in an EXTREMELY slow, soft, meditative whispered pace.'
 
     system_prompt = SYSTEM_INSTRUCTION_TEMPLATE.format(name=ai_name, stage_1=stage_1)
     
@@ -780,7 +765,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
             print("Aura: Voice selected by user without reconnect. Proceeding to intake.")
             new_msg = {
                 "role": "user",
-                "content": f"I have selected my voice and confirmed it as {ai_name}. Please speak exactly these words: 'Welcome to {ai_name}... A place where the noise of the world softens... and you return to yourself... Thank you for giving yourself these few moments... For the next few minutes, there is nowhere to go, nothing to achieve, and nothing to fix... This time belongs only to you... I am {ai_name}, and I will gently guide your journey...' Speak this in an EXTREMELY slow, soft, meditative whispered pace, and then proceed to Stage 2."
+                "content": f"I have selected my voice and confirmed it as {ai_name}. Please gently greet me, introduce yourself as {ai_name}, and ask how I am feeling today. Suggest ONLY 2 or 3 mood options (e.g., Stressed, Tired, Restless). Speak this in an EXTREMELY slow, soft, meditative whispered pace, and then wait for my response."
             }
             messages = context.get_messages()
             messages.append(new_msg)
@@ -832,9 +817,10 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
     async def trigger_continuation():
         new_msg = {
             "role": "user",
-            "content": "[SYSTEM: The meditation is ongoing. The user is resting in silence. Continue your slow, soothing guidance seamlessly. Speak exactly 2 to 3 very slow sentences to deepen their relaxation. Do not greet again. Do not say 'let us continue'. Just naturally flow into the next thought.]"
+            "content": "[SYSTEM: The meditation is ongoing. The user has been silent for 5 seconds. Continue your guidance by saying something gently delightful to the user to deepen their relaxation. Speak exactly 1 to 2 very slow, delightful sentences, and then stop speaking. Do not greet again. Just naturally flow into the next thought.]"
         }
         messages = context.get_messages()
+        messages = [m for m in messages if not (m.get("role") == "user" and "The user has been silent for 5 seconds" in m.get("content", ""))]
         messages.append(new_msg)
         context.set_messages(messages)
         await llm._create_single_response([new_msg])
@@ -860,10 +846,20 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         print("Aura: Client connected.")
-        new_msg = {
-            "role": "user",
-            "content": "The session has started. Greet the user as described in your instructions."
-        }
+        
+        if is_meditation:
+            new_msg = {
+                "role": "user",
+                "content": f"The session has started and the user is in the '{subType}' environment. Guidance mode: {gCat}/{gSub}. BEGIN YOUR GUIDED MEDITATION IMMEDIATELY based on the environment description. Speak exactly 2-4 slow sentences."
+            }
+            if 'guidance_processor' in locals():
+                guidance_processor.is_meditating = True
+        else:
+            new_msg = {
+                "role": "user",
+                "content": "The session has started. Greet the user as described in your instructions."
+            }
+            
         messages = context.get_messages()
         messages.append(new_msg)
         context.set_messages(messages)

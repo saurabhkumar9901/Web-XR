@@ -28,9 +28,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var serverStatus: TextView
     private lateinit var videosStatus: TextView
-    private lateinit var tunnelStatus: TextView
-    private lateinit var tunnelUrlInput: EditText
-    private lateinit var saveButton: Button
     private lateinit var launchButton: Button
     private lateinit var adbInstructions: TextView
 
@@ -41,39 +38,16 @@ class MainActivity : AppCompatActivity() {
         // Bind views
         serverStatus = findViewById(R.id.serverStatus)
         videosStatus = findViewById(R.id.videosStatus)
-        tunnelStatus = findViewById(R.id.tunnelStatus)
-        tunnelUrlInput = findViewById(R.id.tunnelUrlInput)
-        saveButton = findViewById(R.id.saveButton)
         launchButton = findViewById(R.id.launchButton)
         adbInstructions = findViewById(R.id.adbInstructions)
 
-        // Load saved tunnel URL
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val savedUrl = prefs.getString(KEY_TUNNEL_URL, "") ?: ""
-        tunnelUrlInput.setText(savedUrl)
-        updateTunnelOnServer(savedUrl)
-
-        // Save button
-        saveButton.setOnClickListener {
-            val url = tunnelUrlInput.text.toString().trim()
-            prefs.edit().putString(KEY_TUNNEL_URL, url).apply()
-            updateTunnelOnServer(url)
-            Toast.makeText(this, getString(R.string.tunnel_saved), Toast.LENGTH_SHORT).show()
-            updateStatusDisplay()
+        // Request Microphone Permission
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1)
         }
 
-        // Launch button — opens Quest Browser to local server
+        // Launch button — starts server and opens Quest Browser
         launchButton.setOnClickListener {
-            val url = tunnelUrlInput.text.toString().trim()
-            if (url.isBlank()) {
-                Toast.makeText(this, getString(R.string.tunnel_empty_warning), Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-
-            // Save the URL before launching
-            prefs.edit().putString(KEY_TUNNEL_URL, url).apply()
-            updateTunnelOnServer(url)
-
             // Start the foreground service to keep the server alive
             val serviceIntent = Intent(this, LocalServerService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -82,7 +56,7 @@ class MainActivity : AppCompatActivity() {
                 startService(serviceIntent)
             }
 
-            // Open Quest Browser
+            // Open Quest Browser to Local URL
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(LOCAL_URL))
             startActivity(intent)
         }
@@ -94,11 +68,6 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatusDisplay()
-    }
-
-    private fun updateTunnelOnServer(url: String) {
-        val app = application as SolayaApp
-        app.localServer?.tunnelUrl = url
     }
 
     private fun updateStatusDisplay() {
@@ -128,16 +97,6 @@ class MainActivity : AppCompatActivity() {
             videosStatus.text = "0 videos found in:\n${videosDir.absolutePath}\n\nPlease check ADB path."
             videosStatus.setTextColor(getColor(R.color.warning_amber))
             adbInstructions.visibility = View.VISIBLE
-        }
-
-        // Tunnel status
-        val tunnelUrl = tunnelUrlInput.text.toString().trim()
-        if (tunnelUrl.isNotBlank()) {
-            tunnelStatus.text = "🔗 Tunnel: $tunnelUrl"
-            tunnelStatus.setTextColor(getColor(R.color.text_secondary))
-        } else {
-            tunnelStatus.text = "⚠️ No tunnel URL configured"
-            tunnelStatus.setTextColor(getColor(R.color.warning_amber))
         }
     }
 
