@@ -87,10 +87,23 @@ ENV_PROMPT_LIST = _build_env_prompt_list()
 
 # --- CUSTOM SERIALIZER (Resilient Fix) ---
 class LocalPCMRawSerializer(FrameSerializer):
-    """A minimal serializer for 24kHz raw PCM bytes."""
+    """A minimal serializer for 24kHz raw PCM bytes, with time-stretching."""
+    def __init__(self, slow_factor: float = 1.05):
+        super().__init__()
+        self._audio_state = None
+        self.slow_factor = slow_factor
+
     async def serialize(self, frame: Frame) -> str | bytes | None:
         if isinstance(frame, OutputAudioRawFrame):
-            return frame.audio
+            import audioop
+            # Slow down voice and lower pitch for meditative effect
+            # We use 1.20x which drops the pitch by ~3 semitones. 
+            # This makes a female voice deeply soothing without sounding like a male voice!
+            target_rate = int(24000 * self.slow_factor)
+            new_audio, self._audio_state = audioop.ratecv(
+                frame.audio, 2, 1, 24000, target_rate, self._audio_state
+            )
+            return new_audio
         if isinstance(frame, (OutputTransportMessageFrame, OutputTransportMessageUrgentFrame)):
             return json.dumps({"type": "app-message", "data": frame.message})
         if isinstance(frame, UserStartedSpeakingFrame):
@@ -560,13 +573,14 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
             ]
         }
     ]
+    gemini_voice = "Aoede" if voice == "Despina" else "Fenrir"
 
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GEMINI_API_KEY"),
         settings=GeminiLiveLLMService.Settings(
             model="gemini-3.1-flash-live-preview",
             system_instruction=system_prompt,
-            voice=voice,
+            voice=gemini_voice,
             vad=GeminiVADParams(
                 silence_duration_ms=400,
             )
