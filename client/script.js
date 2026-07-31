@@ -857,7 +857,7 @@ async function showEnvironmentMenu(data) {
 
   menuReason.textContent = data.reason || 'Aura has prepared a few options for you.';
   menuModeLabel.textContent = `Guidance mode: ${formatMode(latestMenuGuidance.guidanceCategory)} / ${formatMode(latestMenuGuidance.guidanceSubcategory)}`;
-  recommendedGrid.innerHTML = '';
+  if (recommendedGrid) recommendedGrid.innerHTML = '';
   allEnvironmentsGrid.innerHTML = '';
 
   const recommended = [topSubType, ...recommendedSubTypes]
@@ -866,9 +866,7 @@ async function showEnvironmentMenu(data) {
     .map(getEnvironment)
     .filter(Boolean);
 
-  recommended.forEach((env, i) => {
-    recommendedGrid.appendChild(createEnvironmentCard(env, { ...data, top_sub_type: topSubType }, true, i));
-  });
+  // Recommended grid population removed
 
   ENVIRONMENTS.forEach((env, i) => {
     allEnvironmentsGrid.appendChild(

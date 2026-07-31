@@ -180,19 +180,19 @@ const { scene, renderer, camera, sphere, geometry, particleCount,
     worldW: 0.5, canvasW: 200, canvasH: 70,
     font: 'bold 22px monospace, sans-serif',
     color: '#bcffcc',
-    bg: 'rgba(8, 14, 22, 0.18)', bg2: 'rgba(6, 10, 16, 0.18)',
-    border: 'rgba(188, 255, 204, 0.2)',
+    bg: 'rgba(0, 0, 0, 0)', bg2: 'rgba(0, 0, 0, 0)',
+    border: 'rgba(0, 0, 0, 0)',
   });
-  vrState.timerPanel.position.set(0.0, 0.45, -1.8);
+  vrState.timerPanel.position.set(0.7, 0.45, -1.8);
   vrState.timerPanel.visible = false;
   scene.add(vrState.timerPanel);
 
-  // ---- Feedback Panel ----
+  /* // ---- Feedback Panel ----
   vrState.feedbackPanel = createFeedbackPanel();
   vrState.feedbackPanel.position.set(0, 1.55, -2.1);
-  scene.add(vrState.feedbackPanel);
+  scene.add(vrState.feedbackPanel); */
 
-  // ---- Choose Environment VR Button ----
+  /* // ---- Choose Environment VR Button ----
   vrState.chooseEnvBtn = createVRButton('Choose Environment', 0.55, 0.16, {
     glowColor: '#00e676',
     bg: 'rgba(6, 26, 14, 0.18)',
@@ -206,9 +206,9 @@ const { scene, renderer, camera, sphere, geometry, particleCount,
   vrState.chooseEnvBtn.visible = false;
   vrState.chooseEnvBtn.userData.isChooseEnvBtn = true;
   scene.add(vrState.chooseEnvBtn);
-  vrState.interactables.push(vrState.chooseEnvBtn);
+  vrState.interactables.push(vrState.chooseEnvBtn); */
 
-  // ---- End Session / End Journey VR Button ----
+  /* // ---- End Session / End Journey VR Button ----
   vrState.endSessionBtn = createVRButton('End Session', 0.55, 0.16, {
     glowColor: '#ff1744',
     bg: 'rgba(28, 6, 10, 0.18)',
@@ -222,7 +222,7 @@ const { scene, renderer, camera, sphere, geometry, particleCount,
   vrState.endSessionBtn.visible = false;
   vrState.endSessionBtn.userData.isEndSessionBtn = true;
   scene.add(vrState.endSessionBtn);
-  vrState.interactables.push(vrState.endSessionBtn);
+  vrState.interactables.push(vrState.endSessionBtn); */
 
   // ---- Environment Menu Group ----
   vrState.menuGroup = new THREE.Group();
@@ -691,32 +691,17 @@ const { scene, renderer, camera, sphere, geometry, particleCount,
       vrState.menuGroup.add(reasonPanel);
     }
 
-    // ---- Section label: Recommended ----
-    const recLabel = createTextPanel('✦  RECOMMENDED BY AURA', {
-      worldW: 1.4, canvasW: 580, canvasH: 56,
-      font: 'bold 13px Inter, system-ui, sans-serif',
-      color: 'rgba(188, 255, 204, 0.7)',
-      bg: 'rgba(0,0,0,0)', bg2: 'rgba(0,0,0,0)',
-      border: 'rgba(0,0,0,0)',
-    });
-    recLabel.position.set(0, 1.98, -2.75);
-    vrState.menuGroup.add(recLabel);
+    // Recommended label removed
 
     // ---- Filter Cards (Top 3 vs All) ----
     let displayEnvs = envs;
-    if (!vrState.showAllEnvs) {
-      // Prioritize top sub, then rec subs, then others if needed to fill 3
-      const topEnvs = envs.filter(e => e.subType === topSub);
-      const recEnvs = envs.filter(e => recSubs.includes(e.subType) && e.subType !== topSub);
-      displayEnvs = [...topEnvs, ...recEnvs].slice(0, 3);
-      if (displayEnvs.length === 0) displayEnvs = envs.slice(0, 3); // Fallback
-    }
+    // Always show all envs (removed if !vrState.showAllEnvs block)
 
     // ---- Cards in curved arc ----
     const total = displayEnvs.length;
     // Wider radius for bigger 0.80m cards to avoid overlap
-    const arcSpan = vrState.showAllEnvs ? Math.PI * 1.1 : Math.PI * 0.55;
-    const radius = vrState.showAllEnvs ? 3.4 : 3.0;
+    const arcSpan = Math.PI * 1.1;
+    const radius = 3.4;
     const startAngle = -arcSpan / 2;
 
     displayEnvs.forEach((env, i) => {

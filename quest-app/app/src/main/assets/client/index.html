@@ -558,6 +558,10 @@
       flex: 0 0 auto;
     }
 
+    #menu-btn, #end-btn {
+      display: none !important;
+    }
+
     .star-btn {
       width: 30px;
       height: 30px;
@@ -965,16 +969,13 @@
       top: 24px;
       right: 24px;
       z-index: 100;
-      background: rgba(10, 15, 26, 0.45);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
+      background: transparent;
+      border: none;
       padding: 12px 20px;
       display: none;
       align-items: center;
       gap: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      box-shadow: none;
       animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
@@ -1113,10 +1114,9 @@
 
     <!-- Scrollable card area -->
     <div class="menu-scroll">
-      <div class="menu-section-title">Recommended by Aura</div>
-      <div id="recommended-grid" class="environment-grid"></div>
+      <!-- Recommended grid removed -->
 
-      <div class="menu-section-title">All Environments</div>
+      <!-- All Environments title removed -->
       <div id="all-environments-grid" class="environment-grid"></div>
     </div>
   </div>

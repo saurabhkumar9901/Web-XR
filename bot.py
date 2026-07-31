@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, Request, Response, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import socket
@@ -40,7 +40,12 @@ from pipecat.frames.frames import (
     UserStoppedSpeakingFrame,
     LLMMessagesAppendFrame,
     BotStartedSpeakingFrame,
-    BotStoppedSpeakingFrame
+    BotStoppedSpeakingFrame,
+    InterruptionFrame,
+    CancelFrame,
+    TTSStartedFrame,
+    TTSStoppedFrame,
+    LLMFullResponseEndFrame
 )
 
 # --- CONFIGURATION ---
@@ -87,26 +92,17 @@ ENV_PROMPT_LIST = _build_env_prompt_list()
 
 # --- CUSTOM SERIALIZER (Resilient Fix) ---
 class LocalPCMRawSerializer(FrameSerializer):
-    """A minimal serializer for 24kHz raw PCM bytes, with time-stretching."""
-    def __init__(self, slow_factor: float = 1.1):
+    """A minimal serializer for 24kHz raw PCM bytes."""
+    def __init__(self):
         super().__init__()
-        self._audio_state = None
-        self.slow_factor = slow_factor
 
     async def serialize(self, frame: Frame) -> str | bytes | None:
         if isinstance(frame, OutputAudioRawFrame):
-            import audioop
-            # Slow down voice and lower pitch for meditative effect
-            # We use 1.20x which drops the pitch by ~3 semitones. 
-            # This makes a female voice deeply soothing without sounding like a male voice!
-            target_rate = int(24000 * self.slow_factor)
-            new_audio, self._audio_state = audioop.ratecv(
-                frame.audio, 2, 1, 24000, target_rate, self._audio_state
-            )
-            return new_audio
+            return frame.audio
+                
         if isinstance(frame, (OutputTransportMessageFrame, OutputTransportMessageUrgentFrame)):
             return json.dumps({"type": "app-message", "data": frame.message})
-        if isinstance(frame, UserStartedSpeakingFrame):
+        if isinstance(frame, (UserStartedSpeakingFrame, InterruptionFrame, CancelFrame)):
             return json.dumps({"type": "app-message", "data": {"action": "user_started_speaking"}})
         return None
 
@@ -119,6 +115,52 @@ class LocalPCMRawSerializer(FrameSerializer):
             return InputTransportMessageFrame(message=msg)
         except (json.JSONDecodeError, ValueError, KeyError):
             return None
+
+class TimeStretchProcessor(FrameProcessor):
+    def __init__(self, speed=0.8, channels=1): # 0.8 speed = 1.25x slowdown
+        super().__init__()
+        self._speed = speed
+        self._channels = channels
+        from audiotsm import wsola
+        self._tsm = wsola(channels=channels, speed=speed)
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, (InterruptionFrame, CancelFrame)):
+            self._reset()
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, (TTSStoppedFrame, BotStoppedSpeakingFrame)):
+            self._reset()
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, OutputAudioRawFrame):
+            import numpy as np
+            from audiotsm.io.array import ArrayReader, ArrayWriter
+            audio_chunk = np.frombuffer(frame.audio, dtype=np.int16).reshape(1, -1)
+            reader = ArrayReader(audio_chunk)
+            writer = ArrayWriter(channels=1)
+            
+            self._tsm.run(reader, writer, flush=False)
+            
+            stretched = writer.data
+            if stretched.shape[1] > 0:
+                new_frame = OutputAudioRawFrame(
+                    audio=stretched.astype(np.int16).tobytes(), 
+                    sample_rate=frame.sample_rate, 
+                    num_channels=frame.num_channels
+                )
+                await self.push_frame(new_frame, direction)
+            return
+            
+        await self.push_frame(frame, direction)
+
+    def _reset(self):
+        from audiotsm import wsola
+        self._tsm = wsola(channels=self._channels, speed=self._speed)
 
 class ClientMessageProcessor(FrameProcessor):
     """Intercepts InputTransportMessageFrame directly from the pipeline to process client messages reliably."""
@@ -144,11 +186,11 @@ class ContinuousGuidanceProcessor(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
         
-        if isinstance(frame, BotStartedSpeakingFrame):
+        if isinstance(frame, (BotStartedSpeakingFrame, TTSStartedFrame)):
             self.bot_is_speaking = True
             if self.loop_task:
                 self.loop_task.cancel()
-        elif isinstance(frame, BotStoppedSpeakingFrame):
+        elif isinstance(frame, (BotStoppedSpeakingFrame, TTSStoppedFrame, LLMFullResponseEndFrame)):
             self.bot_is_speaking = False
             if self.is_meditating and not self.user_is_speaking:
                 self._start_guidance_loop()
@@ -342,10 +384,11 @@ POST-TOUR PHASE (ENDING):
 - After the environment phase ends, Aura returns to close the session.
 - You MUST speak this exact ending script slowly and with spacious pauses:
   "Your journey is coming to a close... Take a slow breath in... And gently release... Notice how you feel now... Perhaps only a little lighter... Perhaps a little calmer... Perhaps a little more connected to yourself... Thank you for sharing these moments with {name}... May you carry this stillness with you... Until we meet again... Be well."
-- After saying this, softly ask: "Before you go... would you like to leave a little feedback on your experience?"
+- After saying this, softly ask: "Before you go... would you like to share a little feedback on your experience?"
 - WAIT for their answer.
-- If they answer YES (in any language) to the feedback question: warmly thank them, then immediately call `end_session(show_feedback=true)`.
-- If they answer NO (in any language) to the feedback question: warmly thank them anyway, then immediately call `end_session(show_feedback=false)`.
+- If they answer YES (in any language) to the feedback question: DO NOT call end_session yet! Instead, ask them exactly 3 brief questions (one by one, waiting for their answer after each question). For example: "How did the environment feel?", "Did the meditation pace feel right?", "What could we improve?".
+- AFTER they have answered the 3rd question, warmly thank them, and THEN call `end_session(show_feedback=false)`.
+- If they answer NO (in any language) to the initial feedback question: warmly thank them anyway, then immediately call `end_session(show_feedback=false)`.
 - DO NOT call `end_session` at any other time during the intake or session unless explicitly demanded by the user.
 """
 
@@ -397,65 +440,17 @@ async def videos_list():
     return {"videos": videos}
 
 @app.get("/stream/{filename}")
-async def stream_video(filename: str, request: Request, range: str = Header(None)):
+async def stream_video(filename: str):
     """Serves video files from videos/ with full HTTP Range support."""
     video_path = Path("videos") / filename
     if not video_path.exists() or not video_path.is_file():
         raise HTTPException(status_code=404, detail="Video not found")
 
-    file_size = video_path.stat().st_size
     content_type, _ = mimetypes.guess_type(filename)
     if not content_type:
         content_type = "video/mp4"
 
-    if range:
-        range_str = range.replace("bytes=", "")
-        try:
-            start_str, end_str = range_str.split("-")
-            start = int(start_str) if start_str else 0
-            end = int(end_str) if end_str else file_size - 1
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid Range header")
-
-        if start >= file_size:
-            raise HTTPException(status_code=416, detail="Requested Range Not Satisfiable")
-
-        end = min(end, file_size - 1)
-        length = end - start + 1
-
-        def file_iterator():
-            with open(video_path, "rb") as f:
-                f.seek(start)
-                bytes_left = length
-                while bytes_left > 0:
-                    chunk_size = min(8192, bytes_left)
-                    chunk = f.read(chunk_size)
-                    if not chunk:
-                        break
-                    yield chunk
-                    bytes_left -= len(chunk)
-
-        headers = {
-            "Content-Range": f"bytes {start}-{end}/{file_size}",
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(length),
-            "Content-Type": content_type,
-        }
-        return StreamingResponse(file_iterator(), status_code=206, headers=headers)
-    else:
-        def file_iterator():
-            with open(video_path, "rb") as f:
-                while True:
-                    chunk = f.read(8192)
-                    if not chunk:
-                        break
-                    yield chunk
-        headers = {
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(file_size),
-            "Content-Type": content_type,
-        }
-        return StreamingResponse(file_iterator(), status_code=200, headers=headers)
+    return FileResponse(path=video_path, media_type=content_type)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resume: str = "false"):
@@ -650,8 +645,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
                 print(f"[Aura] Direct socket send failed: {e}")
             
         # Set meditation flag to True via global or passed processor reference
-        if 'guidance_processor' in locals():
-            guidance_processor.is_meditating = True
+        guidance_processor.is_meditating = True
         
         # Return prompt to enforce the 5-phase guided meditation arc
         await params.result_callback({
@@ -707,8 +701,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
 
     async def stop_xr_tour(params: FunctionCallParams):
         print(f"[Aura] TOOL CALLED: stop_xr_tour")
-        if 'guidance_processor' in locals():
-            guidance_processor.is_meditating = False
+        guidance_processor.is_meditating = False
         msg = {"action": "stop_tour"}
         try:
             await websocket.send_text(json.dumps({"type": "app-message", "data": msg}))
@@ -721,8 +714,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
     async def end_session(params: FunctionCallParams):
         arguments = params.arguments
         show_feedback = arguments.get("show_feedback", False)
-        if 'guidance_processor' in locals():
-            guidance_processor.is_meditating = False
+        guidance_processor.is_meditating = False
         print(f"[Aura] TOOL CALLED: end_session (show_feedback: {show_feedback})")
         msg = {"action": "end_session", "show_feedback": show_feedback}
         try:
@@ -764,8 +756,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
         print(f"Aura: Received intercepted client message action={action}")
         if action == "tour_finished":
             print("Aura: Tour finished. Triggering follow-up.")
-            if 'guidance_processor' in locals():
-                guidance_processor.is_meditating = False
+            guidance_processor.is_meditating = False
             new_msg = {
                 "role": "user",
                 "content": "The environment phase has ended. Begin the POST-TOUR PHASE as described in your instructions."
@@ -788,8 +779,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
                 await llm._create_single_response([new_msg])
         elif action == "end_session_requested":
             print("Aura: End session requested by user UI button.")
-            if 'guidance_processor' in locals():
-                guidance_processor.is_meditating = False
+            guidance_processor.is_meditating = False
             new_msg = {
                 "role": "user",
                 "content": "I clicked the End Session button in the UI. Please transition into the post-tour feedback phase by asking me if I want to leave feedback before closing. Then call end_session."
@@ -847,8 +837,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
             messages = context.get_messages()
             messages.append(new_msg)
             context.set_messages(messages)
-            if 'guidance_processor' in locals():
-                guidance_processor.is_meditating = True
+            guidance_processor.is_meditating = True
             await llm._create_single_response([new_msg])
 
     async def trigger_continuation():
@@ -856,28 +845,29 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
             "role": "user",
             "content": "[SYSTEM: The meditation is ongoing. The user is resting in silence. Continue your slow, soothing guidance seamlessly. Speak exactly 2 to 3 very slow sentences to deepen their relaxation. Do not greet again. Do not say 'let us continue'. Just naturally flow into the next thought.]"
         }
-        messages = context.get_messages()
-        messages.append(new_msg)
-        context.set_messages(messages)
+        # We DO NOT append this to the permanent context history to prevent polluting the context after 10+ loops
+        # It will only be used for this single response generation turn.
         await llm._create_single_response([new_msg])
 
     msg_processor = ClientMessageProcessor(on_client_message_received)
     guidance_processor = ContinuousGuidanceProcessor(trigger_continuation)
+    time_stretch_processor = TimeStretchProcessor(speed=1.0/1.25, channels=1)
 
     pipeline = Pipeline([
         transport.input(),
         msg_processor,
-        guidance_processor,
         context_aggregator.user(),
         llm,
+        guidance_processor,
+        time_stretch_processor,
         transport.output(),
         context_aggregator.assistant(),
     ])
 
-    task = PipelineTask(pipeline, params=PipelineParams(
-        allow_interruptions=True,
-        idle_timeout_secs=0,  # Disable idle timeout — Solaya has its own 10-min session timer
-    ))
+    task = PipelineTask(
+        pipeline,
+        idle_timeout_secs=None,  # Disable idle timeout — Solaya has its own 10-min session timer
+    )
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
