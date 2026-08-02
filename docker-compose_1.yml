@@ -1,0 +1,26 @@
+services:
+  aura-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aura-assistant
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8100/mcp
+    depends_on:
+      - mcp-server
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aura-mcp-server
+    command: ["python", "mcp_server.py"]
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8100
+    ports:
+      - "8100:8100"
