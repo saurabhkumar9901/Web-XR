@@ -28,4 +28,4 @@ COPY . .
 EXPOSE 8001
 
 # Command to run the application
-CMD ["python", "bot.py"]
+CMD ["python", "bot_mcp.py"]

@@ -189,6 +189,17 @@ class ContinuousGuidanceProcessor(FrameProcessor):
         self.loop_task = None
         self.is_meditating = False
 
+    def cancel_guidance(self):
+        """Atomically stop meditation mode AND kill any pending timer.
+
+        Call this instead of bare `is_meditating = False` so an in-flight
+        5-second timer can never fire during the feedback / post-tour phase."""
+        self.is_meditating = False
+        if self.loop_task:
+            self.loop_task.cancel()
+            self.loop_task = None
+        print("[Aura] Guidance loop cancelled — meditation mode OFF.")
+
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
@@ -623,6 +634,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
             voice=gemini_voice,
             vad=GeminiVADParams(
                 silence_duration_ms=400,
+                start_sensitivity="START_SENSITIVITY_HIGH",
             )
         ),
         tools=tools
@@ -756,7 +768,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
     async def stop_xr_tour(params: FunctionCallParams):
         print(f"[Aura] TOOL CALLED: stop_xr_tour")
         mcp_result = await call_mcp_tool(mcp_client, "stop_xr_tour", {})
-        guidance_processor.is_meditating = mcp_result.get("set_meditating", False)
+        guidance_processor.cancel_guidance()
         msg = mcp_result.get("message", {"action": "stop_tour"})
         try:
             await websocket.send_text(json.dumps({"type": "app-message", "data": msg}))
@@ -774,13 +786,19 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
         print(f"[Aura] TOOL CALLED: end_session (show_feedback: {show_feedback})")
 
         mcp_result = await call_mcp_tool(mcp_client, "end_session", {"show_feedback": show_feedback})
-        guidance_processor.is_meditating = mcp_result.get("set_meditating", False)
+        guidance_processor.cancel_guidance()
         msg = mcp_result.get("message", {"action": "end_session", "show_feedback": show_feedback})
-        try:
-            await websocket.send_text(json.dumps({"type": "app-message", "data": msg}))
-            print(f"[Aura] END SESSION DISPATCHED.")
-        except Exception as e:
-            print(f"[Aura] End session failed: {e}")
+
+        # Delay the client dispatch so Aura's farewell audio finishes playing
+        # before the client tears down the session UI.
+        async def _delayed_end_session():
+            await asyncio.sleep(8)
+            try:
+                await websocket.send_text(json.dumps({"type": "app-message", "data": msg}))
+                print(f"[Aura] END SESSION DISPATCHED (after delay).")
+            except Exception as e:
+                print(f"[Aura] End session failed: {e}")
+        asyncio.create_task(_delayed_end_session())
 
         await params.result_callback({
             "value": mcp_result.get("llm_prompt", f"Session ended. show_feedback was {show_feedback}.")
@@ -821,7 +839,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
         print(f"Aura: Received intercepted client message action={action}")
         if action == "tour_finished":
             print("Aura: Tour finished. Triggering follow-up.")
-            guidance_processor.is_meditating = False
+            guidance_processor.cancel_guidance()
             new_msg = {
                 "role": "user",
                 "content": "The environment phase has ended. Begin the POST-TOUR PHASE as described in your instructions."
@@ -844,7 +862,7 @@ async def websocket_endpoint(websocket: WebSocket, voice: str = "Despina", resum
                 await llm._create_single_response([new_msg])
         elif action == "end_session_requested":
             print("Aura: End session requested by user UI button.")
-            guidance_processor.is_meditating = False
+            guidance_processor.cancel_guidance()
             new_msg = {
                 "role": "user",
                 "content": "I clicked the End Session button in the UI. Please transition into the post-tour feedback phase by asking me if I want to leave feedback before closing. Then call end_session."
